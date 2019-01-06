@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
+import os
 
 from util import *
 
@@ -181,6 +182,10 @@ class Darknet(nn.Module):
 
     # 加载权重
     def load_weights(self,weightfile):
+
+        if os.path.islink(weightfile):
+            weightfile = os.readlink(weightfile)
+
         fp = open(weightfile,"rb")
 
         # 开头的5个值是header信息,文件的前160个字节存储5个int32值，构成文件头部

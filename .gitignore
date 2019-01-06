@@ -146,7 +146,10 @@ About
 Press h to open a hovercard with more details.
 
 # weights
-*.weights
+weights/
 
 # idea file
 .idea/
+
+# det file
+det/

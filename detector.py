@@ -1,4 +1,6 @@
 from __future__ import division
+
+import datetime
 import time
 import torch
 import torch.nn as nn
@@ -13,6 +15,7 @@ from darknet import Darknet
 import pickle as pkl
 import pandas as pd
 import random
+import sys
 
 
 def arg_parse():
@@ -24,7 +27,7 @@ def arg_parse():
     parser = argparse.ArgumentParser(description='YOLO v3 Detection Module')
 
     parser.add_argument("--images", dest='images', help="Image / Directory containing images to perform detection upon",
-                        default="imgs", type=str)
+                        default="data/test_folder/", type=str)
     parser.add_argument("--det", dest='det', help="Image / Directory to store detections to",default="det", type=str)
     parser.add_argument("--bs", dest="bs", help="Batch size", default=1)
     parser.add_argument("--confidence", dest="confidence", help="Object Confidence to filter predictions", default=0.5)
@@ -38,7 +41,6 @@ def arg_parse():
 
 args = arg_parse()
 images = args.images
-images = "dog-cycle-car.png"
 
 batch_size = int(args.bs)
 confidence = float(args.confidence)
@@ -99,7 +101,7 @@ im_batches = list(map(prep_image, loaded_ims, [inp_dim for x in range(len(imlist
 
 # 列出原始的图片包含的维度
 im_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_ims]
-im_dim_list = torch.FloatTensor(im_dim_list).repeat(1,2)
+im_dim_list = torch.FloatTensor(im_dim_list).repeat(1,2)    # [602,452] -> [602,452,602,452]
 
 if CUDA:
     im_dim_list = im_dim_list.cuda()
@@ -122,17 +124,28 @@ if batch_size != 1:
 # 如果批的write_results函数的输出是int（0），意味着没有检测，我们使用continue继续跳过剩下的循环。
 write = 0
 start_det_loop = time.time()
+
+#prev_time = time.time()
+
 for i, batch in enumerate(im_batches):
     #load the image
     start = time.time()
     if CUDA:
         batch = batch.cuda()
 
-    prediction = model(Variable(batch, volatile = True), CUDA)
+    with torch.no_grad():
+        label = Variable(batch)
 
-    prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
+    prediction = model(label, CUDA)      #一张图片的输出结果[1,10647,85]，其中10647代表bbox数量
+
+    prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)       #输出维度(3,8)
 
     end = time.time()
+
+    # current_time = time.time()
+    # inference_time = datetime.timedelta(seconds=current_time - prev_time)
+    # prev_time = current_time
+    # print('\t+ Batch %d, Inference Time: %s' % (i, inference_time))
 
     if type(prediction) == int:
 
@@ -143,7 +156,7 @@ for i, batch in enumerate(im_batches):
             print("----------------------------------------------------------")
         continue
 
-    prediction[:,0] += i*batch_size    #transform the atribute from index in batch to index in imlist
+    prediction[:,0] += i*batch_size    #transform the atribute from index in batch to index in imlist 将batch中的索引转化为imlist中的索引
 
     if not write:                      #If we have't initialised output
         output = prediction
@@ -172,71 +185,71 @@ for i, batch in enumerate(im_batches):
     # 我们输出张量中包含的预测是相对于网络的输入图像的尺寸的数据，而不是图像的原始大小。因此，在我们绘制边界框之前，
     # 让我们将每个边界框的角点的属性转换为图像的原始尺寸。仅仅将它们重新缩放到输入图像的尺寸并不适用。我们首先需要转换边界框的坐标，
     # 使得它的测量是相对于填充图像中的原始图像区域。
-    im_dim_list = torch.index_select(im_dim_list, 0, output[:, 0].long())
+im_dim_list = torch.index_select(im_dim_list, 0, output[:, 0].long())
 
-    scaling_factor = torch.min(inp_dim / im_dim_list, 1)[0].view(-1, 1)
+scaling_factor = torch.min(inp_dim / im_dim_list, 1)[0].view(-1, 1)
 
-    output[:, [1, 3]] -= (inp_dim - scaling_factor * im_dim_list[:, 0].view(-1, 1)) / 2
-    output[:, [2, 4]] -= (inp_dim - scaling_factor * im_dim_list[:, 1].view(-1, 1)) / 2
+output[:, [1, 3]] -= (inp_dim - scaling_factor * im_dim_list[:, 0].view(-1, 1)) / 2
+output[:, [2, 4]] -= (inp_dim - scaling_factor * im_dim_list[:, 1].view(-1, 1)) / 2
 
-    # 现在，我们的坐标的测量是在填充图像中的原始图像区域上的尺寸。但是，在函数letterbox_image中，我们通过缩放因子调整了图像的两个维度
-    # （记住，这两个维度的调整都用了同一个因子，以保持宽高比）。我们现在撤销缩放以获得原始图像上边界框的坐标。
-    output[:, 1:5] /= scaling_factor
+# 现在，我们的坐标的测量是在填充图像中的原始图像区域上的尺寸。但是，在函数letterbox_image中，我们通过缩放因子调整了图像的两个维度
+# （记住，这两个维度的调整都用了同一个因子，以保持宽高比）。我们现在撤销缩放以获得原始图像上边界框的坐标。
+output[:, 1:5] /= scaling_factor
 
-    # 让我们现在对那些框边界在图像边界外的边界框进行裁剪。
-    for i in range(output.shape[0]):
-        output[i, [1, 3]] = torch.clamp(output[i, [1, 3]], 0.0, im_dim_list[i, 0])
-        output[i, [2, 4]] = torch.clamp(output[i, [2, 4]], 0.0, im_dim_list[i, 1])
+# 让我们现在对那些框边界在图像边界外的边界框进行裁剪。
+for i in range(output.shape[0]):
+    output[i, [1, 3]] = torch.clamp(output[i, [1, 3]], 0.0, im_dim_list[i, 0])
+    output[i, [2, 4]] = torch.clamp(output[i, [2, 4]], 0.0, im_dim_list[i, 1])
 
-    # 如果图像中的边界框太多，将它们全部绘制成同一种颜色可能不大好。将此文件下载到您的检测器文件夹。这是一个pickle文件，它包含许多可随机选择的颜色。
-    output_recast = time.time()
-    class_load = time.time()
-    colors = pkl.load(open("config/pallete", "rb"))
+# 如果图像中的边界框太多，将它们全部绘制成同一种颜色可能不大好。将此文件下载到您的检测器文件夹。这是一个pickle文件，它包含许多可随机选择的颜色。
+output_recast = time.time()
+class_load = time.time()
+colors = pkl.load(open("config/pallete", "rb"))
 
-    # 现在让我们编写一个用于绘制边界框的函数。
-    draw = time.time()
+# 现在让我们编写一个用于绘制边界框的函数。
+draw = time.time()
 
-    # 上面的函数使用从colors中随机选择的颜色绘制一个矩形框。它还在边界框的左上角创建一个填充的矩形，并将检测到的目标的类写入填充矩形中。使用cv2.rectangle函数的-1参数来创建填充的矩形。
-    # 我们在局部定义write函数，以便它可以访问colors列表。我们也可以将colors作为参数，但是这会让我们每个图像只能使用一种颜色，这会破坏我们想要使用多种颜色的目的。
-    def write(x, results):
-        c1 = tuple(x[1:3].int())
-        c2 = tuple(x[3:5].int())
-        img = results[int(x[0])]
-        cls = int(x[-1])
-        color = random.choice(colors)
-        label = "{0}".format(classes[cls])
-        cv2.rectangle(img, c1, c2, color, 1)
-        t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1, 1)[0]
-        c2 = c1[0] + t_size[0] + 3, c1[1] + t_size[1] + 4
-        cv2.rectangle(img, c1, c2, color, -1)
-        cv2.putText(img, label, (c1[0], c1[1] + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 1, [225, 255, 255], 1);
-        return img
+# 上面的函数使用从colors中随机选择的颜色绘制一个矩形框。它还在边界框的左上角创建一个填充的矩形，并将检测到的目标的类写入填充矩形中。使用cv2.rectangle函数的-1参数来创建填充的矩形。
+# 我们在局部定义write函数，以便它可以访问colors列表。我们也可以将colors作为参数，但是这会让我们每个图像只能使用一种颜色，这会破坏我们想要使用多种颜色的目的。
+def write(x, results):
+    c1 = tuple(x[1:3].int())
+    c2 = tuple(x[3:5].int())
+    img = results[int(x[0])]        # 图片的索引
+    cls = int(x[-1])                # 图片的类别
+    color = random.choice(colors)
+    label = "{0}".format(classes[cls])
+    cv2.rectangle(img, c1, c2, color, 1)
+    t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1, 1)[0]
+    c2 = c1[0] + t_size[0] + 3, c1[1] + t_size[1] + 4
+    cv2.rectangle(img, c1, c2, color, -1)
+    cv2.putText(img, label, (c1[0], c1[1] + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 1, [225, 255, 255], 1);
+    return img
 
-    # 代码修改了loaded_ims内的图像。
-    list(map(lambda x: write(x, loaded_ims), output))
+# 代码修改了loaded_ims内的图像。
+list(map(lambda x: write(x, loaded_ims), output))
 
-    # 通过在图像名称前添加“det_”前缀来保存每张图像。我们创建一个地址列表，并把包含检测结果的图像保存到这些地址中。
-    det_names = pd.Series(imlist).apply(lambda x: "{}/det_{}".format(args.det, x.split("/")[-1]))
+# 通过在图像名称前添加“det_”前缀来保存每张图像。我们创建一个地址列表，并把包含检测结果的图像保存到这些地址中。
+det_names = pd.Series(imlist).apply(lambda x: "{}/det_{}".format(args.det, x.split("/")[-1]))
 
-    # 最后，将带有检测结果的图像写入det_names中的地址。
-    list(map(cv2.imwrite, det_names, loaded_ims))
-    end = time.time()
+# 最后，将带有检测结果的图像写入det_names中的地址。
+list(map(cv2.imwrite, det_names, loaded_ims))
+end = time.time()
 
-    """
-    打印时间总结
-    在我们的检测器结束时，我们将打印一份总结，其中包含哪部分代码需要多长时间才能执行。当我们需要比较不同的超参数如何影响检测器的速度时，
-    这非常有用。可以在命令行上执行脚本detection.py时设置超参数，如批的大小，目标置信度和NMS阈值（分别通过bs，confidence，nms_thresh标志传递）。
-    """
-    print("SUMMARY")
-    print("----------------------------------------------------------")
-    print("{:25s}: {}".format("Task", "Time Taken (in seconds)"))
-    print()
-    print("{:25s}: {:2.3f}".format("Reading addresses", load_batch - read_dir))
-    print("{:25s}: {:2.3f}".format("Loading batch", start_det_loop - load_batch))
-    print("{:25s}: {:2.3f}".format("Detection (" + str(len(imlist)) + " images)", output_recast - start_det_loop))
-    print("{:25s}: {:2.3f}".format("Output Processing", class_load - output_recast))
-    print("{:25s}: {:2.3f}".format("Drawing Boxes", end - draw))
-    print("{:25s}: {:2.3f}".format("Average time_per_img", (end - load_batch) / len(imlist)))
-    print("----------------------------------------------------------")
+"""
+打印时间总结
+在我们的检测器结束时，我们将打印一份总结，其中包含哪部分代码需要多长时间才能执行。当我们需要比较不同的超参数如何影响检测器的速度时，
+这非常有用。可以在命令行上执行脚本detection.py时设置超参数，如批的大小，目标置信度和NMS阈值（分别通过bs，confidence，nms_thresh标志传递）。
+"""
+print("SUMMARY")
+print("----------------------------------------------------------")
+print("{:25s}: {}".format("Task", "Time Taken (in seconds)"))
+print()
+print("{:25s}: {:2.3f}".format("Reading addresses", load_batch - read_dir))
+print("{:25s}: {:2.3f}".format("Loading batch", start_det_loop - load_batch))
+print("{:25s}: {:2.3f}".format("Detection (" + str(len(imlist)) + " images)", output_recast - start_det_loop))
+print("{:25s}: {:2.3f}".format("Output Processing", class_load - output_recast))
+print("{:25s}: {:2.3f}".format("Drawing Boxes", end - draw))
+print("{:25s}: {:2.3f}".format("Average time_per_img", (end - load_batch) / len(imlist)))
+print("----------------------------------------------------------")
 
-    torch.cuda.empty_cache()
+torch.cuda.empty_cache()

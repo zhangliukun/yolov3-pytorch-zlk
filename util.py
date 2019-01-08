@@ -49,6 +49,7 @@ def predict_transform(prediction, inp_dim, anchors, num_classes, CUDA = True):
     if CUDA:
         x_offset = x_offset.cuda()
         y_offset = y_offset.cuda()
+        prediction = prediction.cuda()
 
     # Repeats this tensor along the specified dimensions. Unlike :meth:`~Tensor.expand`, this function copies the tensor's data.
     # 比如repeat(4,2)，则是行重复4次，列重复2次
@@ -86,7 +87,7 @@ def write_results(prediction,confidence,num_classes,nms_conf = 0.4):
     """
 
     # 目标置信度阈值，对于每个具有低于阈值的目标分数的边界框，我们将它的每个属性（边界框的整个行）的值设置为0
-    conf_mask = (prediction[:,:,4] > confidence).float().unsqueeze(2)
+    conf_mask = (prediction[:,:,4] > confidence).float().unsqueeze(2)       # prediction[:,:,4] (1,10467) ->  unsqueeze(2) -> (1,10467,1)
     prediction = prediction * conf_mask
 
     # 执行非最大值抑制，我们现在具有的边界框属性由中心坐标以及边界框的高度和宽度描述。但是，使用每个框的一对角点的坐标
@@ -96,7 +97,7 @@ def write_results(prediction,confidence,num_classes,nms_conf = 0.4):
     box_corner[:, :, 1] = (prediction[:, :, 1] - prediction[:, :, 3] / 2)
     box_corner[:, :, 2] = (prediction[:, :, 0] + prediction[:, :, 2] / 2)
     box_corner[:, :, 3] = (prediction[:, :, 1] + prediction[:, :, 3] / 2)
-    prediction[:, :, :4] = box_corner[:, :, :4]
+    prediction[:, :, :4] = box_corner[:, :, :4]     # 将转换后的坐标赋值给prediction，0,1,2,3
 
     # 每幅图像中的true检测结果的数量可能不同。例如，批量大小为3，图像1,2和3分别具有5个，2个和4个true检测结果。因此，一次只能对一张图像
     # 进行置信度阈值和NMS。这意味着，我们不能向量化所涉及的操作，并且必须在prediction的第一维（包含批量中的图像索引）上进行循环。
@@ -108,7 +109,7 @@ def write_results(prediction,confidence,num_classes,nms_conf = 0.4):
         image_pred = prediction[ind]  # image Tensor
         # confidence threshholding
         # 每个边界框行有85个属性，其中80个是类别分数。此时，我们只关心具有最大值的类别分数。因此，我们从每一行中删除80个类别的分数，并添加具有最大值的类别的索引，以及该类别的类别分数
-        max_conf, max_conf_score = torch.max(image_pred[:, 5:5 + num_classes], 1)
+        max_conf, max_conf_score = torch.max(image_pred[:, 5:5 + num_classes], 1)       # 返回第1维的最大值的索引和值
         max_conf = max_conf.float().unsqueeze(1)
         max_conf_score = max_conf_score.float().unsqueeze(1)
         seq = (image_pred[:, :5], max_conf, max_conf_score)
@@ -128,12 +129,12 @@ def write_results(prediction,confidence,num_classes,nms_conf = 0.4):
             continue
 
         # 获取图片中检测到的不同的类
-        img_classes = unique(image_pred_[:,-1])     # -1索引保存着类别的索引
+        img_classes = unique(image_pred_[:,-1])     # 将结果保存到最后一列
 
 
         # 提取特定的类的检测结果，用cls表示
         for cls in img_classes:
-            # get the detections with one particular class
+            # 获得某个类别的检测结果
             cls_mask = image_pred_ * (image_pred_[:, -1] == cls).float().unsqueeze(1)
             class_mask_ind = torch.nonzero(cls_mask[:, -2]).squeeze()
             image_pred_class = image_pred_[class_mask_ind].view(-1, 7)
@@ -157,7 +158,7 @@ def write_results(prediction,confidence,num_classes,nms_conf = 0.4):
                 except IndexError:
                     break
 
-                # 每次迭代，任何具有索引大于i的的边界框，若其IoU大于阈值nms_thresh（具有由i索引的框），则该边界框将被去除。
+                # 每次迭代，任何具有索引大于i的的边界框，若其IoU小于阈值nms_thresh（具有由i索引的框），则该边界框将被去除。
                 iou_mask = (ious < nms_conf).float().unsqueeze(1)
                 image_pred_class[i + 1:] *= iou_mask
 
@@ -195,7 +196,7 @@ def write_results(prediction,confidence,num_classes,nms_conf = 0.4):
 # 由于同一个类可以有多个true的检测结果，我们使用一个称为unique的函数来获取任何给定图像中存在的类
 def unique(tensor):
     tensor_np = tensor.cpu().numpy()        # 如果想把CUDA tensor格式的数据改成numpy时，需要先将其转换成cpu float-tensor随后再转到numpy格式
-    unique_np = np.unique(tensor_np)
+    unique_np = np.unique(tensor_np)        # Returns the sorted unique elements of an array
     unique_tensor = torch.from_numpy(unique_np)
 
     tensor_res = tensor.new(unique_tensor.shape)
@@ -235,6 +236,7 @@ def load_classes(namesfile):
     fp = open(namesfile, "r")
     names = fp.read().split("\n")[:-1]
     return names
+
 
 # 调整图像的大小，保持宽高比一致，并用颜色（128,128,128）填充空白的区域。
 def letterbox_image(img, inp_dim):

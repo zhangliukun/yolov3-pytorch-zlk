@@ -152,7 +152,7 @@ weights/
 .idea/
 
 # det file
-det/
+det/*
 
 # jpg
 .jpg

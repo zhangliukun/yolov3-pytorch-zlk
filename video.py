@@ -100,6 +100,7 @@ out = cv2.VideoWriter('det/video/%s.avi' % videofile.split('/')[2].split('.')[0]
 
 frames = 0
 start = time.time()
+pre_time = start
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -149,8 +150,11 @@ while cap.isOpened():
         if key & 0xFF == ord('q'):
             break
         frames += 1
-        print(time.time() - start)
+
         print("FPS of the video is {:5.2f}".format(frames / (time.time() - start)))
+        print("single image FPS is {:5.2f}".format(1/(time.time()-pre_time)))
+
+        pre_time = time.time()
 
         orig_im = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_CUBIC)
         out.write(orig_im)

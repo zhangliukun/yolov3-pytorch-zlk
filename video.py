@@ -93,9 +93,13 @@ cap = cv2.VideoCapture(videofile)
 
 assert cap.isOpened(), 'Cannot capture source'
 
+args.det = "det/video/"
+if not os.path.exists(args.det):
+    os.makedirs(args.det)
+
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
-print('det/video/%s.avi' % videofile.split('/')[2].split('.')[0])
-out = cv2.VideoWriter('det/video/%s.avi' % videofile.split('/')[2].split('.')[0], fourcc, 15.0, (960, 540))
+print(args.det+'%s.avi' % videofile.split('/')[2].split('.')[0])
+out = cv2.VideoWriter(args.det+'%s.avi' % videofile.split('/')[2].split('.')[0], fourcc, 15.0, (960, 540))
 
 
 frames = 0

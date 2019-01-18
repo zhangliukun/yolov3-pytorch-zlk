@@ -72,7 +72,8 @@ def write(x, results):
     # 只显示行人
     cls = int(x[-1])
     if cls != 0:
-        color = random.choice(colors[1:])
+        return results
+        #color = random.choice(colors[1:])
     else:
         color = colors[0]
 
@@ -158,7 +159,7 @@ while cap.isOpened():
         list(map(lambda x: write(x, frame), output))
 
         # 照片/添加的文字/左上角坐标/字体/字体大小/颜色/字体粗细
-        cv2.putText(frame,currentFps,(0,0),cv2.FONT_HERSHEY_COMPLEX,6,(0,0,255),25)
+        cv2.putText(frame, "{:5.2f}".format(currentFps), (20, 25), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 5)
 
         #cv2.imshow("frame", frame)
         key = cv2.waitKey(1)

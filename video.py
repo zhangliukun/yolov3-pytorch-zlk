@@ -69,13 +69,17 @@ model.eval()
 
 
 def write(x, results):
+    # 只显示行人
+    cls = int(x[-1])
+    if cls != 0:
+        color = random.choice(colors[1:])
+    else:
+        color = colors[0]
+
     c1 = tuple(x[1:3].int())
     c2 = tuple(x[3:5].int())
     img = results
-    cls = int(x[-1])
-    color = random.choice(colors[1:])
-    if cls == 0:
-        color = colors[0]
+
     label = "{0}".format(classes[cls])
     cv2.rectangle(img, c1, c2, color, 1)
     t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1, 1)[0]
@@ -149,7 +153,12 @@ while cap.isOpened():
         classes = load_classes('data/coco.names')
         colors = pkl.load(open("config/pallete", "rb"))
 
+        # 将框框画入原图上面
+        currentFps = 1/(time.time()-pre_time)
         list(map(lambda x: write(x, frame), output))
+
+        # 照片/添加的文字/左上角坐标/字体/字体大小/颜色/字体粗细
+        cv2.putText(frame,currentFps,(0,0),cv2.FONT_HERSHEY_COMPLEX,6,(0,0,255),25)
 
         #cv2.imshow("frame", frame)
         key = cv2.waitKey(1)
@@ -158,7 +167,7 @@ while cap.isOpened():
         frames += 1
 
         print("FPS of the video is {:5.2f}".format(frames / (time.time() - start)))
-        print("single image FPS is {:5.2f}".format(1/(time.time()-pre_time)))
+        print("single image FPS is {:5.2f}".format(currentFps))
 
         #orig_im = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_CUBIC)
         out.write(frame)

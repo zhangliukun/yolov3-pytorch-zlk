@@ -175,5 +175,9 @@ while cap.isOpened():
 
         pre_time = time.time()
 
+        if CUDA:
+            torch.cuda.synchronize()  # 确保CUDA内核与CPU同步。否则，CUDA内核会在GPU作业排队后立即将控制返回给CPU，
+            # 这时GPU作业尚未完成（异步调用）。如果在GPU作业实际结束之前end = time.time（）被打印出来，这可能会导致错误的时间。
+
     else:
         break

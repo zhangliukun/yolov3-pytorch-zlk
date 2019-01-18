@@ -125,9 +125,12 @@ if batch_size != 1:
 write = 0
 start_det_loop = time.time()
 
-#prev_time = time.time()
+
 
 for i, batch in enumerate(im_batches):
+
+    prev_time = time.time()
+
     #load the image
     start = time.time()
     if CUDA:
@@ -142,10 +145,10 @@ for i, batch in enumerate(im_batches):
 
     end = time.time()
 
-    # current_time = time.time()
-    # inference_time = datetime.timedelta(seconds=current_time - prev_time)
-    # prev_time = current_time
-    # print('\t+ Batch %d, Inference Time: %s' % (i, inference_time))
+    current_time = time.time()
+    #inference_time = datetime.timedelta(seconds=current_time - prev_time)
+    inference_time = current_time - prev_time
+    print('one image fps :5.2f' % (1/inference_time))
 
     if type(prediction) == int:
 

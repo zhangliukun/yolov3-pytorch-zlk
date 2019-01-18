@@ -158,10 +158,10 @@ while cap.isOpened():
         print("FPS of the video is {:5.2f}".format(frames / (time.time() - start)))
         print("single image FPS is {:5.2f}".format(1/(time.time()-pre_time)))
 
-        pre_time = time.time()
+        #orig_im = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_CUBIC)
+        out.write(frame)
 
-        orig_im = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_CUBIC)
-        out.write(orig_im)
+        pre_time = time.time()
 
     else:
         break

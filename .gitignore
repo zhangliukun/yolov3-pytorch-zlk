@@ -153,6 +153,7 @@ weights/
 
 # det file
 det/*
+det
 
 # jpg
 .jpg

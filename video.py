@@ -105,8 +105,8 @@ if not os.path.exists(args.det):
     os.makedirs(args.det)
 
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
-print(args.det+'%s.avi' % videofile.split('/')[2].split('.')[0])
-out = cv2.VideoWriter(args.det+'%s.avi' % videofile.split('/')[2].split('.')[0], fourcc, 15.0, (960, 540))
+print(args.det+'%s.avi' % videofile.split('/')[-1].split('.')[0])
+out = cv2.VideoWriter(args.det+'%s.avi' % videofile.split('/')[-1].split('.')[0], fourcc, 15.0, (960, 540))
 
 
 frames = 0

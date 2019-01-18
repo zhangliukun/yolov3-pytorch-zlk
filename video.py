@@ -87,9 +87,9 @@ def write(x, results):
 
 videofile = args.videofile  # or path to the video file.
 
-#cap = cv2.VideoCapture(videofile)
+cap = cv2.VideoCapture(videofile)
 
-cap = cv2.VideoCapture(0)  #for webcam
+#cap = cv2.VideoCapture(0)  #for webcam
 
 assert cap.isOpened(), 'Cannot capture source'
 

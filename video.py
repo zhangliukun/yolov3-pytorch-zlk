@@ -93,6 +93,11 @@ cap = cv2.VideoCapture(videofile)
 
 assert cap.isOpened(), 'Cannot capture source'
 
+fourcc = cv2.VideoWriter_fourcc(*'XVID')
+print('det/video/%s.avi' % videofile.split('/')[2].split('.')[0])
+out = cv2.VideoWriter('det/video/%s.avi' % videofile.split('/')[2].split('.')[0], fourcc, 15.0, (960, 540))
+
+
 frames = 0
 start = time.time()
 
@@ -116,7 +121,7 @@ while cap.isOpened():
         if type(output) == int:
             frames += 1
             print("FPS of the video is {:5.4f}".format(frames / (time.time() - start)))
-            cv2.imshow("frame", frame)
+            #cv2.imshow("frame", frame)
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q'):
                 break
@@ -139,12 +144,16 @@ while cap.isOpened():
 
         list(map(lambda x: write(x, frame), output))
 
-        cv2.imshow("frame", frame)
+        #cv2.imshow("frame", frame)
         key = cv2.waitKey(1)
         if key & 0xFF == ord('q'):
             break
         frames += 1
         print(time.time() - start)
         print("FPS of the video is {:5.2f}".format(frames / (time.time() - start)))
+
+        orig_im = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_CUBIC)
+        out.write(orig_im)
+
     else:
         break
